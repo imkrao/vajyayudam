@@ -1,0 +1,345 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VAJYAYUDAM Admin</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f3f6fb;
+  color:#172033;
+}
+header{
+  background:#123b70;
+  color:white;
+  text-align:center;
+  padding:25px;
+}
+.container{max-width:1100px;margin:25px auto;padding:15px}
+.card{
+  background:white;
+  padding:22px;
+  margin-bottom:20px;
+  border-radius:10px;
+  box-shadow:0 3px 12px #00000010;
+}
+input,select,button{
+  padding:11px;
+  font-size:15px;
+  border-radius:5px;
+  border:1px solid #cbd5e1;
+}
+input{width:100%;margin:8px 0}
+button{
+  cursor:pointer;
+  background:#123b70;
+  color:white;
+  border:none;
+  margin:5px;
+}
+button:hover{background:#2563eb}
+button:disabled{opacity:.5}
+.hidden{display:none}
+.tabs{margin-bottom:15px}
+.tabs button{background:#2563eb}
+.tabs button.active{background:#0f172a}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:650px}
+th,td{
+  padding:12px;
+  border:1px solid #e2e8f0;
+  text-align:left;
+  font-size:14px;
+}
+th{background:#eaf0f8}
+td select{width:120px}
+.message{margin:10px 0;font-weight:bold}
+.error{color:#dc2626}
+.success{color:#15803d}
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>VAJYAYUDAM</h1>
+<p>Administrator Dashboard</p>
+</header>
+
+<div class="container">
+
+<section class="card" id="loginSection">
+<h2>Admin Login</h2>
+<form id="loginForm">
+<label for="password">Administrator Password</label>
+<input id="password" type="password" required>
+<button type="submit">Login</button>
+</form>
+<div id="loginMessage" class="message"></div>
+</section>
+
+<section id="dashboard" class="hidden">
+
+<div class="card topbar">
+<h2>Dashboard</h2>
+<button id="logoutButton">Logout</button>
+</div>
+
+<div class="card">
+<h3>Manage Records</h3>
+
+<div class="tabs">
+<button id="membersButton" class="active">Memberships</button>
+<button id="complaintsButton">Complaints</button>
+</div>
+
+<div id="message" class="message"></div>
+
+<button id="refreshButton">Refresh Records</button>
+<button id="exportButton">Export CSV</button>
+
+<div class="table-wrap" style="margin-top:15px">
+<table>
+<thead id="tableHead"></thead>
+<tbody id="tableBody"></tbody>
+</table>
+</div>
+</div>
+
+</section>
+</div>
+
+<script>
+const loginSection=document.getElementById("loginSection");
+const dashboard=document.getElementById("dashboard");
+const loginMessage=document.getElementById("loginMessage");
+const message=document.getElementById("message");
+const tableHead=document.getElementById("tableHead");
+const tableBody=document.getElementById("tableBody");
+
+let currentType="memberships";
+
+function showMessage(element,text,success=false){
+  element.textContent=text;
+  element.className="message "+(success?"success":"error");
+}
+
+function showDashboard(){
+  loginSection.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+}
+
+function showLogin(){
+  dashboard.classList.add("hidden");
+  loginSection.classList.remove("hidden");
+}
+
+async function api(url,options={}){
+  const response=await fetch(url,{
+    credentials:"same-origin",
+    ...options,
+    headers:{
+      "Content-Type":"application/json",
+      ...(options.headers||{})
+    }
+  });
+
+  const data=await response.json().catch(()=>({}));
+
+  if(!response.ok){
+    throw new Error(data.message||data.error||"Request failed");
+  }
+  return data;
+}
+
+// LOGIN
+document.getElementById("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+
+  try{
+    await api("/api/admin/login",{
+      method:"POST",
+      body:JSON.stringify({
+        password:document.getElementById("password").value
+      })
+    });
+
+    document.getElementById("password").value="";
+    showDashboard();
+    await loadRecords();
+
+  }catch(error){
+    showMessage(loginMessage,error.message);
+  }
+});
+
+// LOGOUT
+document.getElementById("logoutButton").addEventListener("click",async()=>{
+  try{
+    await api("/api/admin/logout",{method:"POST"});
+  }finally{
+    showLogin();
+  }
+});
+
+// MEMBERSHIPS
+document.getElementById("membersButton").addEventListener("click",()=>{
+  currentType="memberships";
+  setActiveButton();
+  loadRecords();
+});
+
+// COMPLAINTS
+document.getElementById("complaintsButton").addEventListener("click",()=>{
+  currentType="complaints";
+  setActiveButton();
+  loadRecords();
+});
+
+function setActiveButton(){
+  document.getElementById("membersButton")
+    .classList.toggle("active",currentType==="memberships");
+
+  document.getElementById("complaintsButton")
+    .classList.toggle("active",currentType==="complaints");
+}
+
+// REFRESH
+document.getElementById("refreshButton").addEventListener("click",loadRecords);
+
+// EXPORT
+document.getElementById("exportButton").addEventListener("click",()=>{
+  window.location.href="/api/admin/export?type="+currentType;
+});
+
+// LOAD RECORDS
+async function loadRecords(){
+  showMessage(message,"Loading records...",true);
+  tableHead.replaceChildren();
+  tableBody.replaceChildren();
+
+  try{
+    const endpoint=currentType==="memberships"
+      ?"/api/admin/memberships"
+      :"/api/admin/complaints";
+
+    const records=await api(endpoint);
+
+    renderRecords(Array.isArray(records)?records:[]);
+    showMessage(message,records.length+" record(s) loaded.",true);
+
+  }catch(error){
+    showMessage(message,error.message);
+  }
+}
+
+// SAFE TEXT DISPLAY
+function cellText(value){
+  const td=document.createElement("td");
+  td.textContent=value==null?"":String(value);
+  return td;
+}
+
+function renderRecords(records){
+  tableHead.replaceChildren();
+  tableBody.replaceChildren();
+
+  if(!records.length){
+    const tr=document.createElement("tr");
+    const td=document.createElement("td");
+    td.colSpan=10;
+    td.textContent="No records found.";
+    tr.appendChild(td);
+    tableBody.appendChild(tr);
+    return;
+  }
+
+  const columns=Object.keys(records[0]);
+  const headerRow=document.createElement("tr");
+
+  columns.forEach(column=>{
+    const th=document.createElement("th");
+    th.textContent=column;
+    headerRow.appendChild(th);
+  });
+
+  const statusHeader=document.createElement("th");
+  statusHeader.textContent="Update Status";
+  headerRow.appendChild(statusHeader);
+  tableHead.appendChild(headerRow);
+
+  records.forEach(record=>{
+    const tr=document.createElement("tr");
+
+    columns.forEach(column=>{
+      tr.appendChild(cellText(record[column]));
+    });
+
+    const statusCell=document.createElement("td");
+    const select=document.createElement("select");
+
+    ["New","Pending","Approved","Resolved","Rejected"].forEach(status=>{
+      const option=document.createElement("option");
+      option.value=status;
+      option.textContent=status;
+      select.appendChild(option);
+    });
+
+    select.value=record.Status||"New";
+
+    const updateButton=document.createElement("button");
+    updateButton.textContent="Update";
+
+    updateButton.addEventListener("click",async()=>{
+      try{
+        await api("/api/admin/status",{
+          method:"POST",
+          body:JSON.stringify({
+            type:currentType,
+            id:String(record.ID),
+            status:select.value
+          })
+        });
+
+        showMessage(message,"Status updated successfully.",true);
+        await loadRecords();
+
+      }catch(error){
+        showMessage(message,error.message);
+      }
+    });
+
+    statusCell.appendChild(select);
+    statusCell.appendChild(updateButton);
+    tr.appendChild(statusCell);
+    tableBody.appendChild(tr);
+  });
+}
+
+// CHECK EXISTING ADMIN SESSION
+async function checkSession(){
+  try{
+    await api("/api/admin/memberships");
+    showDashboard();
+    await loadRecords();
+  }catch{
+    showLogin();
+  }
+}
+
+checkSession();
+</script>
+
+</body>
+</html>
