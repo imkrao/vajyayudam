@@ -1,0 +1,236 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VAJYAYUDAM</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f3f6fb;
+  color:#172033;
+}
+header{
+  background:linear-gradient(135deg,#123b70,#2563eb);
+  color:white;
+  text-align:center;
+  padding:30px 15px;
+}
+header h1{margin:0;font-size:32px}
+header p{margin:10px 0 0}
+nav{
+  background:#0f2e55;
+  text-align:center;
+  padding:12px;
+}
+nav a{
+  color:white;
+  text-decoration:none;
+  margin:10px;
+  font-weight:bold;
+}
+.container{
+  max-width:900px;
+  margin:25px auto;
+  padding:15px;
+}
+.card{
+  background:white;
+  padding:25px;
+  margin-bottom:25px;
+  border-radius:12px;
+  box-shadow:0 4px 15px #00000010;
+}
+h2{color:#123b70}
+label{
+  display:block;
+  margin-top:15px;
+  font-weight:bold;
+}
+input,select,textarea{
+  width:100%;
+  padding:12px;
+  margin-top:7px;
+  border:1px solid #cbd5e1;
+  border-radius:6px;
+  font-size:16px;
+}
+textarea{min-height:120px;resize:vertical}
+button{
+  background:#2563eb;
+  color:white;
+  border:none;
+  padding:13px 20px;
+  margin-top:20px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:16px;
+}
+button:hover{background:#123b70}
+.message{margin-top:15px;font-weight:bold}
+footer{
+  background:#123b70;
+  color:white;
+  text-align:center;
+  padding:20px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>VAJYAYUDAM</h1>
+  <p>Membership & Complaint Portal</p>
+</header>
+
+<nav>
+  <a href="#membership">Membership</a>
+  <a href="#complaint">Complaints</a>
+  <a href="/admin">Admin Login</a>
+</nav>
+
+<div class="container">
+
+<!-- MEMBERSHIP -->
+<section class="card" id="membership">
+<h2>Membership Registration</h2>
+<p>Please enter your details to register.</p>
+
+<form id="membershipForm">
+
+<label for="memberName">Full Name *</label>
+<input id="memberName" name="name" required maxlength="100">
+
+<label for="memberMobile">Mobile Number *</label>
+<input id="memberMobile" name="mobile"
+       type="tel" inputmode="numeric"
+       pattern="[6-9][0-9]{9}"
+       maxlength="10" required>
+
+<label for="memberEmail">Email Address</label>
+<input id="memberEmail" name="email" type="email" maxlength="150">
+
+<label for="memberAddress">Address *</label>
+<textarea id="memberAddress" name="address" required maxlength="500"></textarea>
+
+<label for="memberRole">Membership Type *</label>
+<select id="memberRole" name="role" required>
+<option value="">Select Membership Type</option>
+<option value="General Member">General Member</option>
+<option value="Volunteer">Volunteer</option>
+<option value="Supporter">Supporter</option>
+</select>
+
+<button type="submit">Register Membership</button>
+<div class="message" id="membershipMessage"></div>
+</form>
+</section>
+
+<!-- COMPLAINT -->
+<section class="card" id="complaint">
+<h2>Submit a Complaint</h2>
+<p>Describe your complaint clearly.</p>
+
+<form id="complaintForm">
+
+<label for="complaintName">Full Name *</label>
+<input id="complaintName" name="name" required maxlength="100">
+
+<label for="complaintMobile">Mobile Number *</label>
+<input id="complaintMobile" name="mobile"
+       type="tel" inputmode="numeric"
+       pattern="[6-9][0-9]{9}"
+       maxlength="10" required>
+
+<label for="complaintCategory">Complaint Category *</label>
+<select id="complaintCategory" name="category" required>
+<option value="">Select Category</option>
+<option value="General">General</option>
+<option value="Membership">Membership</option>
+<option value="Service">Service</option>
+<option value="Other">Other</option>
+</select>
+
+<label for="complaintDescription">Complaint Description *</label>
+<textarea id="complaintDescription" name="description"
+          required maxlength="2000"></textarea>
+
+<button type="submit">Submit Complaint</button>
+<div class="message" id="complaintMessage"></div>
+</form>
+</section>
+
+</div>
+
+<footer>
+<p>VAJYAYUDAM | Membership & Complaint Portal</p>
+</footer>
+
+<script>
+async function submitForm(form, endpoint, messageElement) {
+  const button = form.querySelector("button");
+  button.disabled = true;
+  button.textContent = "Please wait...";
+
+  messageElement.textContent = "";
+
+  try {
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.success === false) {
+      throw new Error(result.message || "Submission failed");
+    }
+
+    messageElement.textContent =
+      result.message || "Submitted successfully!";
+    messageElement.style.color = "green";
+    form.reset();
+
+  } catch (error) {
+    messageElement.textContent =
+      error.message || "Unable to submit. Please try again.";
+    messageElement.style.color = "red";
+  } finally {
+    button.disabled = false;
+    button.textContent =
+      endpoint === "/api/membership"
+        ? "Register Membership"
+        : "Submit Complaint";
+  }
+}
+
+document.getElementById("membershipForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  submitForm(
+    this,
+    "/api/membership",
+    document.getElementById("membershipMessage")
+  );
+});
+
+document.getElementById("complaintForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  submitForm(
+    this,
+    "/api/complaint",
+    document.getElementById("complaintMessage")
+  );
+});
+</script>
+
+</body>
+</html>
